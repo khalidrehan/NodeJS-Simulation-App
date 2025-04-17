@@ -10,7 +10,7 @@ const APPDYNAMICS_CONFIG = {
   controllerSslEnabled: true,
   accountName: 'customer1',
   accountAccessKey: 'eeds1224-087-863f-fc6d72ab',
-  applicationName: 'Analytics-Test-App',
+  applicationName: 'NodeJS-Test-App',
   tierName: 'WebTier',
   nodeName: 'TestNode-' + Math.floor(Math.random() * 1000)
 };
