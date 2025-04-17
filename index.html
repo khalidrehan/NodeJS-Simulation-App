@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AppDynamics Analytics Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .panel { background: #f5f5f5; padding: 20px; margin-bottom: 20px; border-radius: 5px; }
+        button { padding: 10px 15px; margin-right: 10px; margin-bottom: 10px; cursor: pointer; }
+        .logs { height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: #f9f9f9; }
+        .stats { display: flex; margin-bottom: 20px; }
+        .stat-box { flex: 1; padding: 10px; background: #e9f7ef; margin-right: 10px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AppDynamics Analytics Test</h1>
+        
+        <div class="panel">
+            <h2>Configuration</h2>
+            <div>
+                <strong>Controller:</strong> appdcont.ncnp.gov.sa:443<br>
+                <strong>App Name:</strong> Analytics-Test-App<br>
+                <strong>Account:</strong> customer1
+            </div>
+            <button id="initBtn">Initialize AppDynamics</button>
+            <span id="initStatus" style="margin-left: 10px; color: #666;">Not initialized</span>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-box">
+                <h3>Page Views</h3>
+                <p id="pageViews">0</p>
+            </div>
+            <div class="stat-box">
+                <h3>Product Views</h3>
+                <p id="productViews">0</p>
+            </div>
+            <div class="stat-box">
+                <h3>Add to Cart</h3>
+                <p id="cartAdds">0</p>
+            </div>
+            <div class="stat-box">
+                <h3>Purchases</h3>
+                <p id="purchases">0</p>
+            </div>
+            <div class="stat-box">
+                <h3>Errors</h3>
+                <p id="errors">0</p>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h2>Simulation Controls</h2>
+            <button id="startBtn">Start Simulation</button>
+            <button id="stopBtn">Stop Simulation</button>
+            <button id="singleBtn">Single Transaction</button>
+            
+            <div style="margin-top: 15px;">
+                <label>Simulation Mode:</label>
+                <select id="simMode">
+                    <option value="browsing">Browsing Only</option>
+                    <option value="purchasing">Purchasing Only</option>
+                    <option value="mixed" selected>Mixed Traffic</option>
+                    <option value="stress">Stress Test</option>
+                    <option value="error">Error Simulation</option>
+                </select>
+                
+                <label style="margin-left: 20px;">Intensity:</label>
+                <input type="range" id="intensity" min="1" max="10" value="5">
+                <span id="intensityValue">5</span>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h2>Activity Log</h2>
+            <button id="clearLogs">Clear Logs</button>
+            <div class="logs" id="logOutput"></div>
+        </div>
+    </div>
+
+    <script>
+        // Application state
+        const state = {
+            initialized: false,
+            running: false,
+            interval: null,
+            stats: {
+                pageViews: 0,
+                productViews: 0,
+                cartAdds: 0,
+                purchases: 0,
+                errors: 0
+            },
+            users: [],
+            products: []
+        };
+
+        // DOM elements
+        const initBtn = document.getElementById('initBtn');
+        const initStatus = document.getElementById('initStatus');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const singleBtn = document.getElementById('singleBtn');
+        const simMode = document.getElementById('simMode');
+        const intensity = document.getElementById('intensity');
+        const intensityValue = document.getElementById('intensityValue');
+        const clearLogs = document.getElementById('clearLogs');
+        const logOutput = document.getElementById('logOutput');
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Load sample data
+            await loadSampleData();
+            
+            // Set up event listeners
+            initBtn.addEventListener('click', initializeAppDynamics);
+            startBtn.addEventListener('click', startSimulation);
+            stopBtn.addEventListener('click', stopSimulation);
+            singleBtn.addEventListener('click', generateTransaction);
+            clearLogs.addEventListener('click', () => logOutput.innerHTML = '');
+            
+            intensity.addEventListener('input', () => {
+                intensityValue.textContent = intensity.value;
+            });
+        });
+
+        // Load sample data
+        async function loadSampleData() {
+            try {
+                const [usersRes, productsRes] = await Promise.all([
+                    fetch('/api/users'),
+                    fetch('/api/products')
+                ]);
+                
+                state.users = await usersRes.json();
+                state.products = await productsRes.json();
+                
+                log('Sample data loaded successfully');
+            } catch (err) {
+                log(`Error loading sample data: ${err.message}`, true);
+            }
+        }
+
+        // Initialize AppDynamics
+        function initializeAppDynamics() {
+            // In a real implementation, this would be done server-side
+            // For this demo, we'll simulate initialization
+            
+            log('Initializing AppDynamics agent...');
+            
+            setTimeout(() => {
+                state.initialized = true;
+                initStatus.textContent = 'Initialized';
+                initStatus.style.color = 'green';
+                log('AppDynamics initialized successfully');
+            }, 1000);
+        }
+
+        // Simulation controls
+        function startSimulation() {
+            if (state.running) {
+                log('Simulation is already running');
+                return;
+            }
+            
+            state.running = true;
+            const intervalTime = 1100 - (intensity.value * 100);
+            
+            state.interval = setInterval(() => {
+                generateTransaction();
+            }, intervalTime);
+            
+            log(`Simulation started (${simMode.value} mode, intensity ${intensity.value})`);
+        }
+
+        function stopSimulation() {
+            if (!state.running) {
+                log('No simulation running');
+                return;
+            }
+            
+            clearInterval(state.interval);
+            state.running = false;
+            log('Simulation stopped');
+        }
+
+        // Generate a transaction
+        function generateTransaction() {
+            if (!state.initialized) {
+                log('Warning: AppDynamics not initialized - analytics will not be captured', true);
+            }
+            
+            const mode = simMode.value;
+            const user = getRandomUser();
+            const product = getRandomProduct();
+            
+            // Determine operation based on mode
+            let operation;
+            
+            switch(mode) {
+                case 'browsing':
+                    operation = Math.random() > 0.7 ? 'viewProduct' : 'browse';
+                    break;
+                case 'purchasing':
+                    operation = Math.random() > 0.3 ? 'purchase' : 'addToCart';
+                    break;
+                case 'error':
+                    operation = Math.random() > 0.5 ? 'error' : 
+                                Math.random() > 0.7 ? 'purchase' : 'browse';
+                    break;
+                case 'stress':
+                    operation = ['browse', 'viewProduct', 'addToCart', 'purchase', 'error'][Math.floor(Math.random() * 5)];
+                    break;
+                default: // mixed
+                    operation = ['browse', 'viewProduct', 'addToCart', 'purchase'][Math.floor(Math.random() * 4)];
+            }
+            
+            // Execute operation
+            switch(operation) {
+                case 'browse':
+                    simulateBrowse(user);
+                    break;
+                case 'viewProduct':
+                    simulateViewProduct(user, product);
+                    break;
+                case 'addToCart':
+                    simulateAddToCart(user, product);
+                    break;
+                case 'purchase':
+                    simulatePurchase(user, product);
+                    break;
+                case 'error':
+                    simulateError(user);
+                    break;
+            }
+        }
+
+        // Simulation operations
+        function simulateBrowse(user) {
+            const pages = ['home', 'products', 'categories', 'deals'];
+            const page = pages[Math.floor(Math.random() * pages.length)];
+            const duration = Math.floor(Math.random() * 5000) + 1000;
+            
+            sendAnalyticsEvent('pageView', {
+                userId: user.id,
+                userType: user.type,
+                page: page,
+                duration: duration
+            });
+            
+            state.stats.pageViews++;
+            updateStats();
+            log(`User ${user.name} browsed ${page} page for ${duration}ms`);
+        }
+
+        function simulateViewProduct(user, product) {
+            const duration = Math.floor(Math.random() * 8000) + 2000;
+            
+            sendAnalyticsEvent('productView', {
+                userId: user.id,
+                userType: user.type,
+                productId: product.id,
+                productName: product.name,
+                productCategory: product.category,
+                price: product.price,
+                duration: duration
+            });
+            
+            state.stats.productViews++;
+            updateStats();
+            log(`User ${user.name} viewed ${product.name} for ${duration}ms`);
+        }
+
+        function simulateAddToCart(user, product) {
+            const quantity = Math.floor(Math.random() * 3) + 1;
+            
+            sendAnalyticsEvent('addToCart', {
+                userId: user.id,
+                userType: user.type,
+                productId: product.id,
+                productName: product.name,
+                quantity: quantity,
+                price: product.price,
+                cartValue: product.price * quantity
+            });
+            
+            state.stats.cartAdds++;
+            updateStats();
+            log(`User ${user.name} added ${quantity}x ${product.name} to cart`);
+        }
+
+        async function simulatePurchase(user, product) {
+            const quantity = Math.floor(Math.random() * 3) + 1;
+            const total = product.price * quantity;
+            
+            // Simulate payment processing (10% chance of failure)
+            if (Math.random() < 0.1) {
+                simulatePaymentError(user, product, total);
+                return;
+            }
+            
+            try {
+                // Create order
+                const order = {
+                    userId: user.id,
+                    products: [{ id: product.id, quantity }],
+                    total: total,
+                    paymentMethod: ['credit', 'paypal', 'giftcard'][Math.floor(Math.random() * 3)]
+                };
+                
+                // Send to server
+                const response = await fetch('/api/orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(order)
+                });
+                
+                if (!response.ok) throw new Error('Order creation failed');
+                
+                // Track analytics
+                sendAnalyticsEvent('purchase', {
+                    userId: user.id,
+                    userType: user.type,
+                    orderId: (await response.json()).id,
+                    productId: product.id,
+                    productName: product.name,
+                    quantity: quantity,
+                    total: total,
+                    paymentMethod: order.paymentMethod
+                });
+                
+                state.stats.purchases++;
+                updateStats();
+                log(`User ${user.name} purchased ${quantity}x ${product.name} for $${total.toFixed(2)}`);
+            } catch (err) {
+                simulateError(user);
+            }
+        }
+
+        function simulateError(user) {
+            const errorTypes = [
+                'Database connection failed',
+                'Payment processing error',
+                'Inventory check failed',
+                'Shipping service unavailable'
+            ];
+            
+            const errorType = errorTypes[Math.floor(Math.random() * errorTypes.length)];
+            
+            sendAnalyticsEvent('error', {
+                userId: user.id,
+                userType: user.type,
+                errorType: errorType,
+                severity: ['low', 'medium', 'high'][Math.floor(Math.random() * 3)]
+            });
+            
+            state.stats.errors++;
+            updateStats();
+            log(`Error occurred for user ${user.name}: ${errorType}`, true);
+        }
+
+        function simulatePaymentError(user, product, amount) {
+            sendAnalyticsEvent('paymentError', {
+                userId: user.id,
+                userType: user.type,
+                productId: product.id,
+                productName: product.name,
+                amount: amount,
+                errorCode: 'PAYMENT_FAILED',
+                reason: ['insufficient_funds', 'card_declined', 'processing_error'][Math.floor(Math.random() * 3)]
+            });
+            
+            state.stats.errors++;
+            updateStats();
+            log(`Payment failed for user ${user.name} - $${amount.toFixed(2)} for ${product.name}`, true);
+        }
+
+        // Helper functions
+        function getRandomUser() {
+            return state.users[Math.floor(Math.random() * state.users.length)];
+        }
+
+        function getRandomProduct() {
+            return state.products[Math.floor(Math.random() * state.products.length)];
+        }
+
+        function updateStats() {
+            document.getElementById('pageViews').textContent = state.stats.pageViews;
+            document.getElementById('productViews').textContent = state.stats.productViews;
+            document.getElementById('cartAdds').textContent = state.stats.cartAdds;
+            document.getElementById('purchases').textContent = state.stats.purchases;
+            document.getElementById('errors').textContent = state.stats.errors;
+        }
+
+        function sendAnalyticsEvent(eventType, data) {
+            if (!state.initialized) return;
+            
+            fetch('/api/analytics', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    eventType,
+                    timestamp: new Date().toISOString(),
+                    ...data
+                })
+            }).catch(err => {
+                console.error('Error sending analytics:', err);
+            });
+        }
+
+        function log(message, isError = false) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            if (isError) {
+                logEntry.style.color = '#d32f2f';
+            }
+            logOutput.appendChild(logEntry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+    </script>
+</body>
+</html>
